@@ -1,0 +1,25 @@
+# Who must review what. The LAST matching line wins.
+# Replace every YOUR-ORG name with a real GitHub team or user, then in GitHub: Settings > Branches > main >
+# "Require a pull request before merging" + "Require review from Code Owners" + require the "CI" checks.
+#
+# The core team owns everything. Each engine folder is also owned by the developer(s) of that engine.
+# CI (see workflows/ci.yml) additionally FAILS any pull request from an engine developer that touches
+# a file outside their own engine folder - so the only way to change core code is through the core team.
+
+*                                           @YOUR-ORG/core
+
+# Engines: <core> + the engine's own developer(s).
+/template-back/src/engines/audit/           @YOUR-ORG/core @YOUR-ORG/audit-dev
+/template-back/src/engines/keyword/         @YOUR-ORG/core @YOUR-ORG/keyword-dev
+/template-back/src/engines/content/         @YOUR-ORG/core @YOUR-ORG/content-dev
+
+# The engine contract, the engine list, the rules that wall engines in, and CI itself stay with the core team
+# (listed explicitly so nobody removes the protection by editing a broader pattern).
+/template-back/src/engines/sdk.ts           @YOUR-ORG/core
+/template-back/src/engines/index.ts         @YOUR-ORG/core
+/template-back/src/engines/CLAUDE.md        @YOUR-ORG/core
+/template-back/src/engines/_template/       @YOUR-ORG/core
+/template-back/test/                        @YOUR-ORG/core
+/template-back/eslint.config.mjs            @YOUR-ORG/core
+/template-back/package.json                 @YOUR-ORG/core
+/.github/                                   @YOUR-ORG/core

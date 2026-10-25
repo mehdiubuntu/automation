@@ -1,0 +1,37 @@
+services:
+  postgres:
+    # 18+ : uuidv7() is built in, which is what every table's id default uses.
+    image: postgres:18-alpine
+    container_name: app-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: app_db
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app123456
+    ports:
+      - '5437:5432'
+    volumes:
+      # 18+ images keep a versioned data directory under /var/lib/postgresql (not .../data).
+      - postgres_data:/var/lib/postgresql
+    networks:
+      - app-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: app-redis
+    restart: always
+    command: redis-server --requirepass redis123456
+    ports:
+      - '6378:6379'
+    volumes:
+      - redis_data:/data
+    networks:
+      - app-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  app-network:
+    driver: bridge

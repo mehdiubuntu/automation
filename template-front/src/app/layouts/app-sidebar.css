@@ -1,0 +1,528 @@
+/* ============================================================================
+   App sidebar rail — ported from the cue-prod JML sidebar pattern with its
+   exact palette (purple gradient chrome, lime #b5e51f). All selectors are
+   namespaced under .app-rail / .app-* (and deliberately unlayered so they
+   out-rank Tailwind utilities). Motion systems kept from the reference:
+   silk hover, infusing active border, avatar shine, cinematic collapse,
+   scoped starfield. Tooltips replace labels when collapsed.
+   ========================================================================= */
+
+/* registered so the conic mask angle can animate (the infusing border draw) */
+@property --app-sweep {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+@keyframes appInfuse {
+  from {
+    --app-sweep: 0deg;
+  }
+  to {
+    --app-sweep: 360deg;
+  }
+}
+@keyframes appAvatarShine {
+  from {
+    transform: translate(-58%, 58%);
+  }
+  to {
+    transform: translate(58%, -58%);
+  }
+}
+
+.app-rail {
+  --app-purple: #3b0764;
+  --app-purple-2: #4c0099;
+  --app-deep: #2a0550;
+  --app-ink: #1a0030; /* tooltip / flyout surface */
+  --app-accent: #b5e51f;
+
+  --app-label: #c7bee0; /* inactive label */
+  --app-icon: #b2a6d4; /* inactive icon */
+  --app-muted: #8e83b0; /* secondary text */
+
+  --app-rail-w: 248px;
+  --app-rail-min: 82px;
+  --app-icon-tilt: -12deg;
+
+  --app-silk: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --app-spring: cubic-bezier(0.34, 1.45, 0.5, 1);
+  --app-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --app-cine: cubic-bezier(0.76, 0, 0.24, 1);
+
+  position: relative;
+  width: var(--app-rail-w);
+  flex: 0 0 var(--app-rail-w);
+  height: 100%;
+  background: linear-gradient(180deg, #3b0764 0%, #2c0651 56%, #210a40 100%);
+  display: flex;
+  flex-direction: column;
+  padding: 20px 12px 12px;
+  box-shadow: 6px 0 30px rgba(26, 0, 48, 0.28);
+  transition:
+    width 0.55s var(--app-cine),
+    flex-basis 0.55s var(--app-cine),
+    padding 0.55s var(--app-cine);
+  /* Above the content column (no z-index, so it would otherwise paint later and
+     clip the collapsed-rail tooltips that overhang the rail's right edge);
+     deliberately below the z-50 modal overlay and z-100 toasts. */
+  z-index: 30;
+}
+.app-rail.app-collapsed {
+  width: var(--app-rail-min);
+  flex-basis: var(--app-rail-min);
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+/* starfield backdrop, scoped to the rail only */
+.app-stars {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+.app-rail > .app-brand,
+.app-rail > .app-profile,
+.app-rail > .app-nav,
+.app-rail > .app-collapse-toggle {
+  position: relative;
+  z-index: 1;
+}
+
+/* ===================== Brand ===================== */
+.app-brand {
+  position: relative;
+  display: block;
+  height: 128px;
+  margin-bottom: 4px;
+  padding: 0 6px 14px;
+  overflow: hidden;
+  transition: height 0.55s var(--app-cine);
+}
+.app-logo-full,
+.app-logo-mark {
+  position: absolute;
+  left: 50%;
+  top: calc((100% - 14px) / 2);
+  transition:
+    opacity 0.45s var(--app-cine),
+    transform 0.55s var(--app-cine);
+}
+/* lockup: mark over "App" + kicker, anchored near the top of the brand box */
+.app-logo-full {
+  top: 2px;
+  transform: translate(-50%, 0);
+  opacity: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  width: auto;
+  max-width: 90%;
+}
+.app-lk-logo svg {
+  height: 58px;
+  width: auto;
+  display: block;
+}
+.app-lk-title {
+  display: block;
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.95rem;
+  line-height: 1.1;
+  letter-spacing: 0.01em;
+  color: #fff;
+}
+.app-lk-sub {
+  display: block;
+  text-align: center;
+  font-family: var(--font-display, Georgia, serif);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 0.62rem;
+  line-height: 1.18;
+  color: var(--app-accent);
+  margin-top: 2px;
+}
+.app-logo-mark {
+  height: 46px;
+  width: auto;
+  transform: translate(-50%, -50%) scale(0.7);
+  opacity: 0;
+}
+.app-rail.app-collapsed .app-brand {
+  height: 60px;
+}
+.app-rail.app-collapsed .app-logo-full {
+  opacity: 0;
+  transform: translate(-50%, -12%) scale(0.72);
+}
+.app-rail.app-collapsed .app-logo-mark {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+/* ===================== Profile (compact, horizontal) ===================== */
+.app-profile {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 11px;
+  text-align: left;
+  padding: 2px 10px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 8px;
+}
+.app-avatar-wrap {
+  position: relative;
+  flex: none;
+}
+.app-avatar {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: conic-gradient(from 200deg, var(--app-purple-2), #7e2bd6, var(--app-purple));
+  color: #fff;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  border: 2px solid var(--app-accent);
+  box-shadow: 0 0 14px rgba(181, 229, 31, 0.32);
+  transition:
+    transform 0.45s var(--app-silk),
+    box-shadow 0.45s var(--app-silk);
+}
+.app-avatar:hover {
+  transform: scale(1.04);
+  box-shadow: 0 0 30px rgba(181, 229, 31, 0.55);
+}
+.app-avatar::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  pointer-events: none;
+  z-index: 2;
+  background: linear-gradient(
+    118deg,
+    transparent 42%,
+    rgba(255, 255, 255, 0.55) 50%,
+    transparent 58%
+  );
+  transform: translate(-58%, 58%);
+}
+.app-avatar:hover::after {
+  animation: appAvatarShine 0.85s var(--app-silk);
+}
+
+.app-role-badge {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  z-index: 3;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 5px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: #fff;
+  background: var(--app-deep);
+  border: 2px solid #2c0651;
+  box-shadow: 0 0 0 1px rgba(181, 229, 31, 0.55);
+  cursor: default;
+  white-space: nowrap;
+}
+
+.app-pf-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+.app-profile-name {
+  margin: 0;
+  font-weight: 700;
+  font-size: 0.84rem;
+  color: var(--app-accent);
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.app-profile-sub {
+  margin: 0;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--app-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.app-rail.app-collapsed .app-profile {
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  border-bottom: none;
+  padding: 2px 6px 10px;
+}
+.app-rail.app-collapsed .app-pf-meta {
+  display: none;
+}
+
+/* ===================== Nav ===================== */
+.app-nav {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.app-nav-divider {
+  height: 1px;
+  margin: 6px 12px;
+  background: rgba(255, 255, 255, 0.08);
+  flex: none;
+}
+
+.app-nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  width: 100%;
+  padding: 10px 13px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 11px;
+  text-align: left;
+  color: var(--app-label);
+  font-size: 0.92rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition:
+    background-color 300ms var(--app-silk),
+    color 240ms var(--app-silk) 40ms,
+    transform 360ms var(--app-spring);
+}
+.app-ico {
+  width: 21px;
+  height: 21px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--app-icon);
+  transition:
+    transform 380ms var(--app-spring) 30ms,
+    color 240ms var(--app-silk) 30ms;
+}
+.app-ico svg {
+  width: 19px;
+  height: 19px;
+}
+.app-label {
+  white-space: nowrap;
+  transition: opacity 0.35s var(--app-cine);
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.app-nav-item:hover {
+  color: #fff;
+  transform: translateX(4px);
+}
+.app-nav-item:hover .app-ico {
+  color: #fff;
+  transform: scale(1.2) rotate(var(--app-icon-tilt));
+}
+.app-nav-item:active {
+  transform: translateX(2px) scale(0.985);
+  transition-duration: 90ms;
+}
+.app-nav-item:focus-visible {
+  outline: 2px solid var(--app-accent);
+  outline-offset: -2px;
+}
+
+/* active: rounded pill, faint accent fill, rounded left accent */
+.app-nav-item.app-active {
+  background: rgba(181, 229, 31, 0.08);
+  color: var(--app-accent);
+  font-weight: 600;
+  box-shadow: inset 3px 0 0 0 var(--app-accent);
+}
+.app-nav-item.app-active .app-ico {
+  color: var(--app-accent);
+}
+
+/* silk hover: liquid highlight, masked so it fades out at every edge */
+.app-nav-item::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      180px circle at var(--app-mx, 50%) var(--app-my, 50%),
+      rgba(255, 255, 255, 0.17),
+      transparent 62%
+    ),
+    radial-gradient(72% 150% at 50% 50%, rgba(255, 255, 255, 0.11), transparent 76%);
+  -webkit-mask-image: radial-gradient(46% 44% at 50% 50%, #000 0%, #000 44%, transparent 100%);
+  mask-image: radial-gradient(46% 44% at 50% 50%, #000 0%, #000 44%, transparent 100%);
+  opacity: 0;
+  transition: opacity 0.5s var(--app-silk);
+}
+.app-nav-item:hover::before {
+  opacity: 1;
+}
+
+/* infusing border: an accent ring that draws in from the left, all the way around */
+.app-nav-item::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  border: 1.6px solid var(--app-accent);
+  -webkit-mask-image: conic-gradient(from 270deg, #000 var(--app-sweep), transparent var(--app-sweep));
+  mask-image: conic-gradient(from 270deg, #000 var(--app-sweep), transparent var(--app-sweep));
+  opacity: 0;
+}
+.app-nav-item.app-active::after {
+  opacity: 1;
+  animation: appInfuse 0.7s var(--app-silk) forwards;
+}
+
+/* ===================== Collapsed: icons + hover tooltips ===================== */
+.app-rail.app-collapsed .app-nav {
+  overflow: visible;
+}
+.app-rail.app-collapsed .app-nav-item {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+  gap: 0;
+}
+.app-rail.app-collapsed .app-nav-item:hover {
+  transform: none;
+}
+.app-rail.app-collapsed .app-nav-item > .app-label {
+  width: 0;
+  min-width: 0;
+  flex: 0 0 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.app-nav-item > .app-tip {
+  position: absolute;
+  left: calc(100% + 14px);
+  top: 50%;
+  transform: translateY(-50%) translateX(-6px);
+  background: var(--app-ink);
+  color: #fff;
+  padding: 7px 12px;
+  border-radius: 9px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+  font-size: 0.84rem;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 60;
+  display: none;
+  transition:
+    opacity 0.18s var(--app-ease),
+    transform 0.18s var(--app-ease);
+}
+.app-rail.app-collapsed .app-nav-item > .app-tip {
+  display: block;
+}
+.app-rail.app-collapsed .app-nav-item:hover > .app-tip {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+}
+/* during the collapse switch, freeze tooltips so they can't flash outside the rail */
+.app-rail.app-switching .app-nav-item > .app-tip {
+  transition: none !important;
+}
+
+/* ===================== Collapse toggle ===================== */
+.app-collapse-toggle {
+  margin-top: 10px;
+  align-self: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  flex: none;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #eae3f8;
+  transition:
+    background 0.25s var(--app-ease),
+    border-color 0.25s var(--app-ease),
+    transform 0.2s var(--app-spring);
+}
+.app-collapse-toggle:hover {
+  background: rgba(181, 229, 31, 0.14);
+  border-color: rgba(181, 229, 31, 0.4);
+  color: var(--app-accent);
+}
+.app-collapse-toggle:active {
+  transform: scale(0.92);
+}
+.app-collapse-toggle:focus-visible {
+  outline: 2px solid var(--app-accent);
+  outline-offset: 2px;
+}
+.app-collapse-toggle svg {
+  width: 20px;
+  height: 20px;
+  transition: transform 0.55s var(--app-cine);
+}
+.app-rail.app-collapsed .app-collapse-toggle svg {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-rail * {
+    transition: none !important;
+  }
+  .app-avatar:hover::after {
+    animation: none !important;
+  }
+  .app-nav-item.app-active::after {
+    animation: none !important;
+    --app-sweep: 360deg;
+  }
+}

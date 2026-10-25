@@ -1,0 +1,5 @@
+export * from '@presentation/common/decorators/validators/is-future-date'
+export * from '@presentation/common/decorators/validators/is-letters-and-numbers.validator'
+export * from '@presentation/common/decorators/validators/is-phone.validator'
+export * from '@presentation/common/decorators/validators/is-secure-password.validator'
+export * from '@presentation/common/decorators/validators/normalized-email.decorator'

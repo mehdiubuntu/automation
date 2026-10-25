@@ -1,0 +1,9 @@
+.env
+.env.dev
+.env.development
+.env.prod
+.env.stage
+node_modules
+dist
+FTP
+test

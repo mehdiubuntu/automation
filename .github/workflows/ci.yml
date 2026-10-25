@@ -1,0 +1,106 @@
+name: CI
+
+# Every pull request and every push to main runs the same gate.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  back:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: template-back
+    services:
+      # A real PostgreSQL 18 for the integration specs (migrations, job queue, worker).
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: app123456
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U app"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://app:app123456@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: template-back/package-lock.json
+      - run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Architecture rules (layers + the walls around engines)
+        # One violation is the known, acknowledged baseline (application.module -> infrastructure.module). Any more fails.
+        run: |
+          output="$(npm run dep-check 2>&1 || true)"
+          echo "$output"
+          violations="$(echo "$output" | grep -oE '[0-9]+ dependency violations' | grep -oE '^[0-9]+' || echo 0)"
+          test "$violations" -le 1
+      - name: Lint (new code must be clean; the inherited baseline must not grow)
+        run: |
+          npx eslint "{src,test}/**/*.ts" --format json --output-file eslint-report.json || true
+          node -e "const r=require('./eslint-report.json');const n=r.reduce((s,f)=>s+f.errorCount,0);console.log('eslint errors:',n);process.exit(n>44?1:0)"
+      - name: Tests (unit + integration against PostgreSQL 18)
+        run: npm test
+
+  front:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: template-front
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: template-front/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run build
+
+  # Engine developers may change ONLY their own engine folder. Everyone else is not restricted by this check
+  # (CODEOWNERS still makes the core team review them).
+  engine-guard:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    env:
+      # One line per engine: <engine id>=<GitHub login>[,<GitHub login>...]. Replace the REPLACE-* placeholders.
+      ENGINE_OWNERS: |
+        audit=REPLACE-audit-dev-login
+        keyword=REPLACE-keyword-dev-login
+        content=REPLACE-content-dev-login
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Engine developers touch only their own engine folder
+        env:
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          engine="$(echo "$ENGINE_OWNERS" | awk -F= -v author="$AUTHOR" 'NF == 2 { n = split($2, logins, ","); for (i = 1; i <= n; i++) if (tolower(logins[i]) == tolower(author)) print $1 }' | head -n 1)"
+          if [ -z "$engine" ]; then
+            echo "$AUTHOR is not listed as an engine developer: no folder restriction applies."
+            exit 0
+          fi
+          allowed="template-back/src/engines/$engine/"
+          outside="$(git diff --name-only "$BASE_SHA" HEAD | grep -v "^$allowed" || true)"
+          if [ -n "$outside" ]; then
+            echo "::error::$AUTHOR develops the '$engine' engine and may only change files under $allowed"
+            echo "These changed files are outside it:"
+            echo "$outside"
+            exit 1
+          fi
+          echo "OK: every changed file is under $allowed"
